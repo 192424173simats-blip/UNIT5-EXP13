@@ -1,32 +1,61 @@
+# 🤖 Meta-Learning Based Swarm Robotics (Single-Slide Simulation)
+
+This project demonstrates a **swarm of autonomous robots** performing an **area coverage task** in a **dynamic and uncertain environment**.  
+A **meta-learning mechanism** adapts the swarm’s collective behavior based on past performance feedback.
+
+---
+
+## 🧠 Key Concepts
+- Decentralized swarm coordination
+- Local robot interactions
+- Area coverage task
+- Meta-learning (learning to adapt behavior parameters)
+- Dynamic and uncertain environment
+
+---
+
+## 📌 Single-Slide Python Implementation
+
+```python
 import numpy as np, random
 
-# --- Robot ---
+# Robot definition
 class Robot:
-    def __init__(self, n): self.p=np.random.rand(2)*n; self.v=np.random.randn(2)
-    def move(self, a, b, nbrs):
-        exp=a*np.random.randn(2)
-        coh=b*(np.mean([r.p for r in nbrs],0)-self.p) if nbrs else 0
-        self.v=np.clip(self.v+exp+coh,-1,1); self.p+=self.v
+    def __init__(self, size):
+        self.pos = np.random.rand(2) * size
+        self.vel = np.random.randn(2)
 
-# --- Environment ---
+    def move(self, alpha, beta, neighbors):
+        explore = alpha * np.random.randn(2)
+        cohesion = beta * (np.mean([n.pos for n in neighbors], 0) - self.pos) if neighbors else 0
+        self.vel = np.clip(self.vel + explore + cohesion, -1, 1)
+        self.pos += self.vel
+
+# Swarm environment
 class SwarmEnv:
-    def __init__(self,N=20,S=40):
-        self.S=S; self.R=[Robot(S) for _ in range(N)]
-        self.C=np.zeros((S,S))
-    def step(self,a,b):
-        for r in self.R:
-            n=[x for x in self.R if np.linalg.norm(x.p-r.p)<5 and x!=r]
-            r.move(a,b,n); x,y=np.clip(r.p.astype(int),0,self.S-1)
-            self.C[x,y]=1
-    def score(self): return np.sum(self.C)/(self.S**2)
+    def __init__(self, robots=20, size=40):
+        self.size = size
+        self.swarm = [Robot(size) for _ in range(robots)]
+        self.coverage = np.zeros((size, size))
 
-# --- Meta-Learner ---
-a,b,lr=0.5,0.3,0.1
-for ep in range(30):
-    env=SwarmEnv()
-    for _ in range(100): env.step(a,b)
-    perf=env.score()
-    a+=lr if perf<0.6 else -lr/2
-    b+=lr if perf>0.6 else -lr/2
-    a,b=np.clip(a,0.1,1),np.clip(b,0.1,1)
-    print(f"Ep{ep+1}: Coverage={perf:.2f}")
+    def step(self, alpha, beta):
+        for r in self.swarm:
+            neighbors = [n for n in self.swarm if np.linalg.norm(n.pos - r.pos) < 5 and n != r]
+            r.move(alpha, beta, neighbors)
+            x, y = np.clip(r.pos.astype(int), 0, self.size - 1)
+            self.coverage[x, y] = 1
+
+    def performance(self):
+        return np.sum(self.coverage) / (self.size ** 2)
+
+# Meta-learning loop
+alpha, beta, lr = 0.5, 0.3, 0.1
+for episode in range(30):
+    env = SwarmEnv()
+    for _ in range(100):
+        env.step(alpha, beta)
+    score = env.performance()
+    alpha += lr if score < 0.6 else -lr / 2
+    beta  += lr if score > 0.6 else -lr / 2
+    alpha, beta = np.clip(alpha, 0.1, 1), np.clip(beta, 0.1, 1)
+    print(f"Episode {episode+1}: Coverage = {score:.2f}")
